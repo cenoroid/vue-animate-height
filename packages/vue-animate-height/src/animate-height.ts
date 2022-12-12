@@ -53,7 +53,7 @@ export const AnimateHeight = defineComponent({
 		},
 		animationStateClasses: {
 			type: Object as PropType<AnimationStateClasses>,
-			default: ANIMATION_STATE_CLASSES,
+			default: ()=> ANIMATION_STATE_CLASSES,
 		},
 		applyInlineTransitions: {
 			type: Boolean,
@@ -77,9 +77,9 @@ export const AnimateHeight = defineComponent({
 			>,
 			default: 'ease',
 		},
-		height: {
-			type: [String, Number] as PropType<string | number>,
-			validator(this: void, value: 'auto' | number): boolean {
+    collapsedHeight: {
+      type: [String, Number] as PropType<string | number>,
+      validator(this: void, value: 'auto' | number): boolean {
 				if (
 					(typeof value === 'number' && value >= 0) ||
 					isPercentage(value) ||
@@ -100,6 +100,10 @@ export const AnimateHeight = defineComponent({
 			type: String,
 			default: undefined,
 		},
+    isExpanded:{
+      type: Boolean,
+      default: false,
+    }
 	},
 	emits: {
 		animationEnd(payload: { newHeight: number }) {
@@ -116,20 +120,26 @@ export const AnimateHeight = defineComponent({
 
 		type Height = 'auto' | number | `${number}%`;
 
-		let height: Height = 'auto';
+    let collapsedHeight: Height = parseHeight(props.collapsedHeight);
+    let height: Height = collapsedHeight;
 		let overflow = 'visible';
 
-		if (isNumber(props.height)) {
-			height = Math.max(0, Number(props.height));
-			overflow = 'hidden';
-		} else if (isPercentage(props.height)) {
-			// If value is string "0%" make sure we convert it to number 0
-			height = props.height === '0%' ? 0 : (props.height as Height);
-			overflow = 'hidden';
-		}
+    function parseHeight(value: string | number) : Height {
+      let height: Height = 'auto';
+      if (isNumber(value)) {
+        height = Math.max(0, Number(value));
+        overflow = 'hidden';
+      } else if (isPercentage(value)) {
+        // If value is string "0%" make sure we convert it to number 0
+        height = value === '0%' ? 0 : (value as Height);
+        overflow = 'hidden';
+      }
+
+      return height;
+    }
 
 		function showContent(height: Height) {
-			if (height === 0) {
+			if (height === collapsedHeight) {
 				contentElement.value!.style.display = '';
 			}
 		}
@@ -217,23 +227,22 @@ export const AnimateHeight = defineComponent({
 		let animationClassesTimeoutId: NodeJS.Timeout;
 
 		onMounted(() => {
-			const { height } = state.value;
-
 			// Hide content if height is 0 (to prevent tabbing into it)
 			// Check for contentElement is added cause this would fail in tests (react-test-renderer)
 			// Read more here: https://github.com/Stanko/react-animate-height/issues/17
-			if (contentElement.value?.style !== undefined && height !== null) {
-				hideContent(height);
+			if (contentElement.value?.style !== undefined && collapsedHeight !== null) {
+				hideContent(collapsedHeight);
 			}
 		});
 
 		let prevHeightProp: Height = height;
+    let prevIsExpanded: boolean = props.isExpanded;
 
 		onUpdated(() => {
-			const { delay, duration, height } = props;
+			const { delay, duration, isExpanded } = props;
 
 			// Don't re-start animation if the height property hasn't changed
-			if (contentElement.value === undefined || height === prevHeightProp) {
+			if (contentElement.value === undefined || prevIsExpanded === isExpanded) {
 				return;
 			}
 
